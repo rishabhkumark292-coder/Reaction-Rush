@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reaction Rush</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #0b1020;
+  color: white;
+  font-family: Arial, sans-serif;
+  padding: 15px;
+}
+
+.game {
+  width: 100%;
+  max-width: 520px;
+  background: #151b31;
+  padding: 22px;
+  border-radius: 25px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,.45);
+}
+
+h1 {
+  margin: 0;
+  font-size: 34px;
+}
+
+.subtitle {
+  color: #9da8c7;
+  margin-bottom: 20px;
+}
+
+.stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.stat {
+  flex: 1;
+  background: #222a47;
+  padding: 12px;
+  border-radius: 15px;
+}
+
+.stat small {
+  display: block;
+  color: #8e99b8;
+  font-size: 11px;
+}
+
+.stat strong {
+  font-size: 23px;
+}
+
+#reactionBox {
+  height: 400px;
+  border-radius: 20px;
+  background: #344263;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+#reactionBox.waiting {
+  background: #d94b5c;
+}
+
+#reactionBox.go {
+  background: #20c77a;
+}
+
+#reactionBox.early {
+  background: #d88930;
+}
+
+#reactionBox.result {
+  background: #4b587d;
+}
+
+.message {
+  font-size: 30px;
+  font-weight: bold;
+  padding: 20px;
+}
+
+.message small {
+  display: block;
+  font-size: 15px;
+  margin-top: 10px;
+  opacity: .8;
+}
+
+.result-number {
+  font-size: 65px;
+}
+
+button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 15px;
+  border: none;
+  border-radius: 14px;
+  background: white;
+  color: #12182b;
+  font-size: 17px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:active {
+  transform: scale(.98);
+}
+
+#history {
+  margin-top: 15px;
+  color: #aab4d0;
+  font-size: 13px;
+}
+
+.pill {
+  display: inline-block;
+  background: #222a47;
+  padding: 7px 10px;
+  margin: 3px;
+  border-radius: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="game">
+
+  <h1>⚡ Reaction Rush</h1>
+
+  <div class="subtitle">
+    How fast can you react?
+  </div>
+
+  <div class="stats">
+
+    <div class="stat">
+      <small>BEST</small>
+      <strong id="best">—</strong>
+    </div>
+
+    <div class="stat">
+      <small>AVERAGE</small>
+      <strong id="average">—</strong>
+    </div>
+
+  </div>
+
+  <div id="reactionBox">
+
+    <div class="message" id="message">
+      Tap to Start
+      <small>
+        Wait for GREEN, then tap as fast as possible!
+      </small>
+    </div>
+
+  </div>
+
+  <button id="startButton">
+    Start Test
+  </button>
+
+  <div id="history">
+    No attempts yet
+  </div>
+
+</div>
+
+
+<script>
+
+let state = "idle";
+
+let timer;
+
+let startTime;
+
+let attempts = [];
+
+let best = 0;
+
+
+const box = document.getElementById("reactionBox");
+
+const message = document.getElementById("message");
+
+const button = document.getElementById("startButton");
+
+const bestDisplay = document.getElementById("best");
+
+const averageDisplay = document.getElementById("average");
+
+const historyDisplay = document.getElementById("history");
+
+
+/* Load saved best score */
+
+try {
+
+  best =
+    parseInt(
+      localStorage.getItem("reactionBest")
+    ) || 0;
+
+} catch(e) {}
+
+
+/* Update statistics */
+
+function updateStats() {
+
+  bestDisplay.textContent =
+    best ? best + " ms" : "—";
+
+
+  if (attempts.length > 0) {
+
+    let total = 0;
+
+    attempts.forEach(function(time) {
+      total += time;
+    });
+
+    let average =
+      Math.round(total / attempts.length);
+
+    averageDisplay.textContent =
+      average + " ms";
+
+
+    let html = "";
+
+    attempts.slice(0,8).forEach(function(time) {
+
+      html +=
+        '<span class="pill">' +
+        time +
+        ' ms</span>';
+
+    });
+
+    historyDisplay.innerHTML = html;
+
+  } else {
+
+    averageDisplay.textContent = "—";
+
+    historyDisplay.textContent =
+      "No attempts yet";
+
+  }
+
+}
+
+
+/* Change game screen */
+
+function setScreen(className, title, subtitle) {
+
+  box.className = className;
+
+  message.innerHTML =
+    title +
+    "<small>" +
+    subtitle +
+    "</small>";
+
+}
+
+
+/* Start a test */
+
+function startTest() {
+
+  clearTimeout(timer);
+
+  state = "waiting";
+
+  setScreen(
+    "waiting",
+    "WAIT...",
+    "Don't tap yet!"
+  );
+
+  button.textContent =
+    "Waiting...";
+
+
+  /*
+    Random delay between
+    1 and 4.5 seconds
+  */
+
+  const delay =
+    1000 +
+    Math.random() * 3500;
+
+
+  timer = setTimeout(function() {
+
+    state = "go";
+
+    startTime =
+      performance.now();
+
+
+    setScreen(
+      "go",
+      "TAP NOW!",
+      "Tap as quickly as possible!"
+    );
+
+    button.textContent =
+      "Tap the green area";
+
+  }, delay);
+
+}
+
+
+/* Handle player tap */
+
+function handleTap() {
+
+  /*
+    Start a new test
+  */
+
+  if (
+    state === "idle" ||
+    state === "result" ||
+    state === "early"
+  ) {
+
+    startTest();
+
+    return;
+  }
+
+
+  /*
+    Player tapped too early
+  */
+
+  if (state === "waiting") {
+
+    clearTimeout(timer);
+
+    state = "early";
+
+    setScreen(
+      "early",
+      "TOO EARLY!",
+      "You tapped before GREEN."
+    );
+
+    button.textContent =
+      "Try Again";
+
+    return;
+  }
+
+
+  /*
+    Successful reaction
+  */
+
+  if (state === "go") {
+
+    const reactionTime =
+      Math.round(
+        performance.now() - startTime
+      );
+
+
+    attempts.unshift(
+      reactionTime
+    );
+
+
+    /*
+      Update personal best
+    */
+
+    if (
+      best === 0 ||
+      reactionTime < best
+    ) {
+
+      best = reactionTime;
+
+      try {
+
+        localStorage.setItem(
+          "reactionBest",
+          best
+        );
+
+      } catch(e) {}
+
+    }
+
+
+    state = "result";
+
+
+    setScreen(
+      "result",
+      '<span class="result-number">' +
+      reactionTime +
+      ' ms</span>',
+      "Your reaction time"
+    );
+
+
+    button.textContent =
+      "Test Again";
+
+
+    updateStats();
+
+  }
+
+}
+
+
+/*
+  Touch / mouse
+*/
+
+box.addEventListener(
+  "pointerdown",
+  function(event) {
+
+    event.preventDefault();
+
+    handleTap();
+
+  },
+  { passive: false }
+);
+
+
+/*
+  Start button
+*/
+
+button.addEventListener(
+  "click",
+  function(event) {
+
+    event.preventDefault();
+
+    startTest();
+
+  }
+);
+
+
+/*
+  Spacebar support
+*/
+
+document.addEventListener(
+  "keydown",
+  function(event) {
+
+    if (
+      event.code === "Space" ||
+      event.key === " "
+    ) {
+
+      event.preventDefault();
+
+      handleTap();
+
+    }
+
+  }
+);
+
+
+/* Initial statistics */
+
+updateStats();
+
+</script>
+
+</body>
+</html>
